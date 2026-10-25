@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b1118">
+<title>Uydu Analiz</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--bg:#0b1118;--panel:#121b26;--line:#233143;--txt:#e6edf5;--dim:#8aa0b6;--ok:#34d399;--warn:#fbbf24;--bad:#f87171}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font:14px/1.35 -apple-system,system-ui,sans-serif;overflow:hidden;overscroll-behavior:none}
+#app{display:flex;flex-direction:column;height:100%;height:100dvh;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+#top{display:flex;gap:6px;padding:8px 10px}
+#top input{flex:1;min-width:0;font-size:16px;padding:9px 10px;background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:10px}
+button{font:inherit;color:var(--txt);background:#1b2735;border:1px solid var(--line);border-radius:10px;padding:9px 12px}
+button:active{filter:brightness(1.35)}
+.pri{background:#0369a1;border-color:#0ea5e9;font-weight:600}
+#msg{margin:0 10px 6px;padding:6px 9px;border-radius:8px;font-size:12px;background:#1f2a37;border:1px solid var(--warn);color:var(--warn)}
+#stage{position:relative;flex:1;min-height:140px;background:#05090e}
+#map{position:absolute;inset:0;background:#05090e}
+#hud{position:absolute;top:8px;left:8px;z-index:700;background:rgba(18,27,38,.85);border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-size:11px;font-variant-numeric:tabular-nums;pointer-events:none}
+#cross{position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;z-index:650;pointer-events:none}
+#cross:before,#cross:after{content:"";position:absolute;background:rgba(255,255,255,.9);box-shadow:0 0 2px #000}
+#cross:before{left:12px;top:0;width:2px;height:26px}
+#cross:after{top:12px;left:0;height:2px;width:26px}
+#divider{position:absolute;top:0;bottom:0;left:50%;width:0;z-index:660;pointer-events:none}
+#divider .line{position:absolute;top:0;bottom:0;left:-1px;width:2px;background:#fff;box-shadow:0 0 4px #000}
+#handle{position:absolute;top:50%;left:-20px;width:40px;height:40px;margin-top:-20px;border-radius:50%;background:rgba(18,27,38,.92);border:2px solid #fff;pointer-events:auto;touch-action:none;display:flex;align-items:center;justify-content:center;font-size:16px}
+#panel{background:var(--panel);border-top:1px solid var(--line);padding:8px 10px;max-height:46vh;overflow:auto}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+label{display:flex;flex-direction:column;font-size:11px;color:var(--dim);gap:3px}
+select{font-size:15px;padding:7px;background:#0d141c;color:var(--txt);border:1px solid var(--line);border-radius:8px;width:100%}
+.dateRow{display:flex;gap:4px;margin-top:4px}
+.dateRow select{flex:1;min-width:0}
+.dateRow button{padding:4px 10px}
+.seg{display:flex;margin:8px 0 4px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{flex:1;border:0;border-radius:0;background:transparent;padding:8px 4px;font-size:13px}
+.seg button.on{background:#0c4a6e;color:#fff}
+input[type=range]{width:100%}
+.tog{display:flex;align-items:center;gap:8px;margin:8px 0}
+.tog input[type=range]{flex:1}
+.chk{flex-direction:row;align-items:center;color:var(--txt);font-size:13px;gap:5px;white-space:nowrap}
+.btns{display:flex;gap:8px;margin:6px 0}
+.btns button{flex:1;font-size:13px}
+details{margin-top:6px}
+summary{color:var(--dim);padding:4px 0}
+.hint{font-size:11.5px;color:var(--dim);line-height:1.5}
+.hint a{color:#38bdf8}
+#dlg{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center}
+#dlg .card{background:var(--panel);border:1px solid var(--line);border-radius:14px 14px 0 0;width:100%;max-width:520px;padding:14px;padding-bottom:calc(14px + env(safe-area-inset-bottom))}
+#dlg textarea{width:100%;font-size:16px;padding:8px;margin:8px 0;background:#0d141c;color:var(--txt);border:1px solid var(--line);border-radius:8px}
+#dlg input[type=file]{font-size:14px;color:var(--dim);margin-bottom:8px;width:100%}
+.pin{width:16px;height:16px;border-radius:50%;background:#f59e0b;border:2px solid #fff;box-shadow:0 0 4px #000}
+.leaflet-container{font:inherit;background:#05090e}
+.leaflet-control-attribution{font-size:9px!important;background:rgba(255,255,255,.7)!important}
+.popup img{max-width:200px;border-radius:6px;display:block;margin:6px 0}
+.popup p{margin:0 0 4px;white-space:pre-wrap}
+.popup small{color:#555;display:block}
+.popup button{margin-top:6px;padding:4px 10px;color:#111;background:#eee;border-color:#ccc}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="top">
+    <input id="q" type="search" placeholder="Yer ara veya enlem, boylam yaz" enterkeyhint="search">
+    <button id="bGo" class="pri">Ara</button>
+    <button id="bLoc" aria-label="Konumum">📍</button>
+  </div>
+  <div id="msg" hidden></div>
+
+  <div id="stage">
+    <div id="map"></div>
+    <div id="cross"></div>
+    <div id="hud">--</div>
+    <div id="divider"><div class="line"></div><div id="handle">⇆</div></div>
+  </div>
+
+  <div id="panel">
+    <div class="pair">
+      <div>
+        <label>Sol katman (A)
+          <select id="selA">
+            <option value="esri" selected>Uydu (Esri, güncel)</option>
+            <option value="clarity">Uydu (Esri Clarity)</option>
+            <option value="s2">Sentinel-2 (2023, 10 m)</option>
+            <option value="wb">Tarihsel (Esri Wayback)</option>
+            <option value="topo">Topografya</option>
+          </select>
+        </label>
+        <div class="dateRow" id="rowA" hidden><button id="pA">‹</button><select id="dateA"></select><button id="nA">›</button></div>
+      </div>
+      <div>
+        <label>Sağ katman (B)
+          <select id="selB">
+            <option value="esri">Uydu (Esri, güncel)</option>
+            <option value="clarity">Uydu (Esri Clarity)</option>
+            <option value="s2">Sentinel-2 (2023, 10 m)</option>
+            <option value="wb" selected>Tarihsel (Esri Wayback)</option>
+            <option value="topo">Topografya</option>
+          </select>
+        </label>
+        <div class="dateRow" id="rowB"><button id="pB">‹</button><select id="dateB"></select><button id="nB">›</button></div>
+      </div>
+    </div>
+
+    <div class="seg"><button id="mPerde" class="on">Perde</button><button id="mBlend">Karışım</button></div>
+    <label><span id="rngLab">Perde konumu</span><input id="rng" type="range" min="0" max="100" value="50"></label>
+
+    <div class="tog">
+      <label class="chk"><input type="checkbox" id="cHill" checked> Arazi gölgesi</label>
+      <input id="rHill" type="range" min="0" max="100" value="55" aria-label="Arazi gölgesi şiddeti">
+      <label class="chk"><input type="checkbox" id="cLab"> Etiket</label>
+    </div>
+
+    <div class="btns">
+      <button id="bNote">📍 Merkeze not ekle</button>
+      <button id="bExport">Notları indir</button>
+    </div>
+
+    <details>
+      <summary>Nasıl yorumlanır?</summary>
+      <p class="hint">
+        <b>Perde:</b> Beyaz tutamacı sürükleyerek iki katmanı ya da iki tarihi karşılaştırın. Aynı yer farklı yıllarda farklı görünür; iz iki ayrı tarihte de varsa daha güvenilirdir.<br>
+        <b>Bitki ve toprak izleri:</b> Kurak mevsimde düz çizgiler, dikdörtgenler, daireler ya da farklı renkte şeritler (bitki daha erken kurur ya da daha yeşil kalır) altta yapı olabileceğine işaret eder. Doğal oluşumlar nadiren düz ve düzenli olur.<br>
+        <b>Arazi gölgesi:</b> Höyük, çukur, sur ya da yol gibi yüzey kabartılarını öne çıkarır. Gölge tek yönden (kuzeybatıdan) düşer; ışığa paralel uzanan izler zayıf görünebilir. Çözünürlüğü kabadır, küçük yapıları göstermez.<br>
+        <b>Tarih etiketleri:</b> Wayback tarihleri görüntünün yayın tarihidir, çekim tarihi değildir. Aynı görüntü birkaç tarihte tekrar edebilir.<br>
+        <b>Sınır:</b> Bunlar yüzeyden görülen ipuçlarıdır, yer altını doğrudan görmez. Burada LiDAR ve radar katmanı yoktur, çünkü ücretsiz ve genel erişime açık bir kaynak bulunmuyor.<br>
+        <b>Hukuk:</b> Kazı, define arama ve buluntu toplamak izne tabidir. Kültür varlığı olabilecek bir iz bulursanız fotoğraf ve koordinatı en yakın müzeye bildirin.<br>
+        <b>Dışarıda aç:</b> <a id="lApple" href="#" target="_blank" rel="noopener">Apple Haritalar</a> · <a id="lGoogle" href="#" target="_blank" rel="noopener">Google Haritalar (uydu)</a>
+      </p>
+    </details>
+  </div>
+</div>
+
+<div id="dlg" hidden>
+  <div class="card">
+    <b>Yeni not</b> <small id="dlgPos" style="color:#8aa0b6"></small>
+    <textarea id="nText" rows="3" placeholder="Ne gördünüz? (bitki rengi farkı, çöküntü, taş sırası...)"></textarea>
+    <input id="nPhoto" type="file" accept="image/*">
+    <div class="btns"><button id="nSave" class="pri">Kaydet</button><button id="nCancel">İptal</button></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+
+function setMsg(t){const m=$('msg');if(!t){m.hidden=true;return}m.hidden=false;m.textContent=t}
+
+if(typeof L==='undefined'){
+  document.getElementById('stage').innerHTML='<p style="padding:16px">Harita kütüphanesi yüklenemedi. İnternet bağlantınızı kontrol edip sayfayı yenileyin.</p>';
+  return;
+}
+
+/* ---------- Harita ---------- */
+let v0={lat:39,lng:35,z:6};
+try{const j=JSON.parse(localStorage.getItem('uydu-view')||'null');if(j&&isFinite(j.lat)&&isFinite(j.lng)&&isFinite(j.z))v0=j}catch(e){}
+const map=L.map('map',{zoomControl:false,maxZoom:21,minZoom:3,zoomAnimation:true}).setView([v0.lat,v0.lng],v0.z);
+map.attributionControl.setPrefix(false);
+L.control.scale({imperial:false,position:'bottomleft'}).addTo(map);
+
+map.createPane('paneA').style.zIndex=200;
+map.createPane('paneB').style.zIndex=210;
+const pH=map.createPane('paneH');pH.style.zIndex=300;pH.style.mixBlendMode='multiply';pH.style.pointerEvents='none';
+const pL=map.createPane('paneL');pL.style.zIndex=590;pL.style.pointerEvents='none';
+
+const LAYERS={
+  esri:{url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',nz:19,attr:'Esri, Maxar, Earthstar Geographics'},
+  clarity:{url:'https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',nz:19,attr:'Esri Clarity, Maxar'},
+  s2:{url:'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2023_3857/default/g/{z}/{y}/{x}.jpg',nz:14,attr:'Sentinel-2 cloudless 2023 by EOX (Copernicus)'},
+  topo:{url:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',nz:17,attr:'OpenTopoMap (CC-BY-SA), OSM',subs:'abc'}
+};
+
+const hill=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}',
+  {pane:'paneH',maxNativeZoom:15,maxZoom:21,opacity:0.55,attribution:'Esri hillshade'}).addTo(map);
+const labels=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+  {pane:'paneL',maxNativeZoom:19,maxZoom:21});
+
+/* ---------- Katmanlar A / B ---------- */
+const state={mode:'perde',split:0.5,blend:0.5};
+const layer={A:null,B:null};
+let wbItems=[];
+
+function setLayer(side){
+  if(layer[side]){map.removeLayer(layer[side]);layer[side]=null}
+  const kind=$('sel'+side).value;
+  $('row'+side).hidden=(kind!=='wb');
+  let url,nz,attr,subs;
+  if(kind==='wb'){
+    const it=wbItems[+$('date'+side).value];
+    if(!it){applyMode();return}
+    url=it.url;nz=19;attr='Esri Wayback '+it.date;subs='abc';
+  }else{
+    const d=LAYERS[kind];url=d.url;nz=d.nz;attr=d.attr;subs=d.subs||'abc';
+  }
+  const l=L.tileLayer(url,{pane:'pane'+side,maxNativeZoom:nz,maxZoom:21,attribution:attr,subdomains:subs});
+  l.addTo(map);
+  layer[side]=l;
+  applyMode();
+}
+
+function updateClip(){
+  const a=layer.A&&layer.A.getContainer();
+  const b=layer.B&&layer.B.getContainer();
+  if(state.mode!=='perde'||!layer.A||!layer.B){
+    if(a)a.style.clip='';
+    if(b)b.style.clip='';
+    return;
+  }
+  const size=map.getSize();
+  const nw=map.containerPointToLayerPoint([0,0]);
+  const se=map.containerPointToLayerPoint(size);
+  const x=nw.x+Math.round(size.x*state.split);
+  if(a)a.style.clip='rect('+[nw.y,x,se.y,nw.x].join('px,')+'px)';
+  if(b)b.style.clip='rect('+[nw.y,se.x,se.y,x].join('px,')+'px)';
+}
+
+function applyMode(){
+  const perde=state.mode==='perde';
+  $('divider').hidden=!perde;
+  $('divider').style.left=(state.split*100)+'%';
+  $('mPerde').classList.toggle('on',perde);
+  $('mBlend').classList.toggle('on',!perde);
+  $('rngLab').textContent=perde?'Perde konumu':'B katmanı görünürlüğü';
+  $('rng').value=Math.round((perde?state.split:state.blend)*100);
+  if(layer.B)layer.B.setOpacity(perde?1:state.blend);
+  updateClip();
+}
+
+map.on('move zoom viewreset resize',updateClip);
+
+$('mPerde').onclick=()=>{state.mode='perde';applyMode()};
+$('mBlend').onclick=()=>{state.mode='blend';applyMode()};
+$('rng').oninput=e=>{
+  const v=+e.target.value/100;
+  if(state.mode==='perde'){state.split=clamp(v,0.02,0.98);$('divider').style.left=(state.split*100)+'%';updateClip()}
+  else{state.blend=v;if(layer.B)layer.B.setOpacity(v)}
+};
+
+/* Perde tutamacı */
+const hdl=$('handle');let drag=false;
+hdl.addEventListener('pointerdown',e=>{drag=true;hdl.setPointerCapture(e.pointerId);map.dragging.disable();e.preventDefault()});
+hdl.addEventListener('pointermove',e=>{
+  if(!drag)return;
+  const r=$('stage').getBoundingClientRect();
+  state.split=clamp((e.clientX-r.left)/r.width,0.02,0.98);
+  $('rng').value=Math.round(state.split*100);
+  $('divider').style.left=(state.split*100)+'%';
+  updateClip();
+});
+const endDrag=()=>{if(drag){drag=false;map.dragging.enable()}};
+hdl.addEventListener('pointerup',endDrag);
+hdl.addEventListener('pointercancel',endDrag);
+
+$('selA').onchange=()=>setLayer('A');
+$('selB').onchange=()=>setLayer('B');
+$('dateA').onchange=()=>setLayer('A');
+$('dateB').onchange=()=>setLayer('B');
+function stepDate(side,dir){
+  const s=$('date'+side);
+  const i=clamp(s.selectedIndex+dir,0,s.options.length-1);
+  if(i!==s.selectedIndex){s.selectedIndex=i;setLayer(side)}
+}
+$('pA').onclick=()=>stepDate('A',1);   // geriye (daha eski)
+$('nA').onclick=()=>stepDate('A',-1);  // ileriye (daha yeni)
+$('pB').onclick=()=>stepDate('B',1);
+$('nB').onclick=()=>stepDate('B',-1);
+
+/* Arazi gölgesi ve etiketler */
+$('cHill').onchange=e=>{e.target.checked?hill.addTo(map):map.removeLayer(hill)};
+$('rHill').oninput=e=>hill.setOpacity(+e.target.value/100);
+$('cLab').onchange=e=>{e.target.checked?labels.addTo(map):map.removeLayer(labels)};
+
+/* ---------- Wayback tarih listesi ---------- */
+const WB_CFG='https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/waybackconfig.json';
+fetch(WB_CFG).then(r=>{if(!r.ok)throw new Error('http '+r.status);return r.json()}).then(cfg=>{
+  const arr=Array.isArray(cfg)?cfg:Object.values(cfg);
+  const seen=new Set(),items=[];
+  for(const e of arr){
+    const title=e.itemTitle||e.title||e.releaseDateLabel||'';
+    const m=title.match(/\d{4}-\d{2}-\d{2}/);
+    const url=e.itemURL;
+    if(!m||!url||seen.has(m[0]))continue;
+    seen.add(m[0]);
+    items.push({date:m[0],url:url.replace('{level}','{z}').replace('{row}','{y}').replace('{col}','{x}')});
+  }
+  if(!items.length)throw new Error('liste boş');
+  items.sort((a,b)=>a.date<b.date?1:-1);
+  wbItems=items;
+  for(const side of ['A','B']){
+    const s=$('date'+side);
+    s.innerHTML='';
+    items.forEach((it,i)=>{const o=document.createElement('option');o.value=i;o.textContent=it.date;s.appendChild(o)});
+  }
+  // B için varsayılan: en yeni görüntüden yaklaşık 2 yıl eski
+  const d=new Date(items[0].date);d.setFullYear(d.getFullYear()-2);
+  const target=d.toISOString().slice(0,10);
+  let idx=items.findIndex(it=>it.date<=target);
+  if(idx<0)idx=items.length-1;
+  $('dateB').selectedIndex=idx;
+  $('dateA').selectedIndex=0;
+  setLayer('A');setLayer('B');
+}).catch(err=>{
+  setMsg('Tarihsel görüntü listesi alınamadı ('+err.message+'). Sentinel-2 kullanılıyor.');
+  document.querySelectorAll('#selA option[value=wb],#selB option[value=wb]').forEach(o=>o.remove());
+  $('selB').value='s2';
+  $('rowA').hidden=true;$('rowB').hidden=true;
+  setLayer('A');setLayer('B');
+});
+$('dateA').innerHTML='<option>Yükleniyor…</option>';
+$('dateB').innerHTML='<option>Yükleniyor…</option>';
+setLayer('A');
+
+/* ---------- Konum / arama / HUD ---------- */
+let me=null,meAcc=null;
+$('bLoc').onclick=()=>{
+  setMsg('');
+  map.locate({setView:true,maxZoom:18,enableHighAccuracy:true,timeout:15000});
+};
+map.on('locationfound',e=>{
+  if(!me){
+    meAcc=L.circle(e.latlng,{radius:e.accuracy,color:'#38bdf8',weight:1,fillOpacity:0.1,interactive:false}).addTo(map);
+    me=L.circleMarker(e.latlng,{radius:7,color:'#082f49',weight:2,fillColor:'#38bdf8',fillOpacity:1,interactive:false}).addTo(map);
+  }else{me.setLatLng(e.latlng);meAcc.setLatLng(e.latlng);meAcc.setRadius(e.accuracy)}
+});
+map.on('locationerror',e=>setMsg('Konum alınamadı: '+e.message+' (Safari konum iznini kontrol edin)'));
+
+async function doSearch(){
+  const q=$('q').value.trim();
+  if(!q)return;
+  let m=q.match(/^(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)$/);
+  if(!m){
+    const m2=q.match(/^(-?\d+,\d+)\s*[;\s]\s*(-?\d+,\d+)$/);
+    if(m2)m=[q,m2[1].replace(',','.'),m2[2].replace(',','.')];
+  }
+  if(m){
+    const lat=+m[1],lon=+m[2];
+    if(Math.abs(lat)<=90&&Math.abs(lon)<=180){map.setView([lat,lon],Math.max(map.getZoom(),17));return}
+  }
+  try{
+    setMsg('Aranıyor…');
+    const r=await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=tr&q='+encodeURIComponent(q));
+    const j=await r.json();
+    if(!j.length){setMsg('Yer bulunamadı.');return}
+    setMsg('');
+    map.setView([+j[0].lat,+j[0].lon],16);
+  }catch(e){setMsg('Arama başarısız: '+e.message)}
+}
+$('bGo').onclick=doSearch;
+$('q').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();doSearch();$('q').blur()}});
+
+function updateHud(){
+  const c=map.getCenter(),z=map.getZoom();
+  $('hud').textContent=c.lat.toFixed(5)+', '+c.lng.toFixed(5)+' · z'+z;
+  $('lApple').href='https://maps.apple.com/?ll='+c.lat.toFixed(6)+','+c.lng.toFixed(6)+'&z='+Math.round(z)+'&t=k';
+  $('lGoogle').href='https://www.google.com/maps/@'+c.lat.toFixed(6)+','+c.lng.toFixed(6)+','+Math.round(z)+'z/data=!3m1!1e3';
+}
+map.on('move',updateHud);
+map.on('moveend',()=>{
+  updateHud();
+  const c=map.getCenter();
+  try{localStorage.setItem('uydu-view',JSON.stringify({lat:c.lat,lng:c.lng,z:map.getZoom()}))}catch(e){}
+});
+updateHud();
+
+new ResizeObserver(()=>{map.invalidateSize();updateClip()}).observe($('stage'));
+
+/* ---------- Saha notları ---------- */
+let notes=[];
+try{notes=JSON.parse(localStorage.getItem('uydu-notlar')||'[]')}catch(e){notes=[]}
+const noteLayer=L.layerGroup().addTo(map);
+const pinIcon=L.divIcon({className:'',html:'<div class="pin"></div>',iconSize:[16,16],iconAnchor:[8,8]});
+
+function saveNotes(){
+  try{localStorage.setItem('uydu-notlar',JSON.stringify(notes))}
+  catch(e){setMsg('Kayıt alanı doldu; yeni not tarayıcıya kaydedilemedi. Notları indirip eskileri silmeyi deneyin.')}
+}
+function renderNotes(){
+  noteLayer.clearLayers();
+  for(const n of notes){
+    const mk=L.marker([n.lat,n.lon],{icon:pinIcon});
+    const box=document.createElement('div');box.className='popup';
+    const p=document.createElement('p');p.textContent=n.text||'(not yok)';box.appendChild(p);
+    if(n.photo){const im=document.createElement('img');im.src=n.photo;box.appendChild(im)}
+    const s=document.createElement('small');
+    s.textContent=n.lat.toFixed(5)+', '+n.lon.toFixed(5)+' · '+new Date(n.t).toLocaleString('tr-TR');
+    box.appendChild(s);
+    const del=document.createElement('button');del.textContent='Sil';
+    del.onclick=()=>{if(confirm('Bu not silinsin mi?')){notes=notes.filter(x=>x.id!==n.id);saveNotes();renderNotes()}};
+    box.appendChild(del);
+    mk.bindPopup(box);
+    noteLayer.addLayer(mk);
+  }
+}
+renderNotes();
+
+let pending=null;
+$('bNote').onclick=()=>{
+  const c=map.getCenter();
+  pending={lat:c.lat,lon:c.lng};
+  $('dlgPos').textContent=c.lat.toFixed(5)+', '+c.lng.toFixed(5);
+  $('nText').value='';$('nPhoto').value='';
+  $('dlg').hidden=false;
+};
+$('nCancel').onclick=()=>{$('dlg').hidden=true;pending=null};
+
+function readPhoto(file){
+  return new Promise(res=>{
+    if(!file)return res(null);
+    const fr=new FileReader();
+    fr.onload=()=>{
+      const im=new Image();
+      im.onload=()=>{
+        const s=Math.min(1,900/Math.max(im.width,im.height));
+        const c=document.createElement('canvas');
+        c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);
+        c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+        res(c.toDataURL('image/jpeg',0.7));
+      };
+      im.onerror=()=>res(null);
+      im.src=fr.result;
+    };
+    fr.onerror=()=>res(null);
+    fr.readAsDataURL(file);
+  });
+}
+$('nSave').onclick=async()=>{
+  if(!pending)return;
+  const photo=await readPhoto($('nPhoto').files[0]);
+  notes.push({id:Date.now()+''+Math.floor(Math.random()*1000),lat:pending.lat,lon:pending.lon,text:$('nText').value.trim(),photo,t:Date.now()});
+  saveNotes();renderNotes();
+  $('dlg').hidden=true;pending=null;
+};
+
+$('bExport').onclick=()=>{
+  if(!notes.length){setMsg('İndirilecek not yok.');return}
+  const gj={type:'FeatureCollection',features:notes.map(n=>({
+    type:'Feature',
+    geometry:{type:'Point',coordinates:[n.lon,n.lat]},
+    properties:{not:n.text,zaman:new Date(n.t).toISOString(),fotograf_var:!!n.photo}
+  }))};
+  const blob=new Blob([JSON.stringify(gj,null,1)],{type:'application/geo+json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='saha-notlari.geojson';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),4000);
+};
+
+applyMode();
+})();
+</script>
+</body>
+</html>
