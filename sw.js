@@ -1,5 +1,5 @@
 /* Tünel PDR service worker: uygulamayı ve harita kitaplığını telefona kaydeder, çevrimdışı açılır. */
-const V = 'tunel-pdr-20261114220825';
+const V = 'tunel-pdr-20261115112327';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-180.png'];
 const LIBS = [
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js',

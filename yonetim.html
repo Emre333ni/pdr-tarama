@@ -87,7 +87,16 @@ function liveRow(x) {
   var i = x.info || {}, on = x.age <= ONL, st = STATE[i.state] || 'AÇIK';
   var loc = (i.state === 'live' && i.lat != null && i.lng != null) ? '<a class="m" target="_blank" rel="noopener" href="https://www.google.com/maps?q=' + encodeURIComponent(i.lat + ',' + i.lng) + '">Son hesaplanan konum ↗</a>' : '';
   return '<div class="card u"><div class="n">' + esc(x.username) + (on ? '<span class="tag live">şu an açık</span>' : '<span class="tag">' + ago(x.at) + '</span>') + (on ? '<span class="tag ' + (i.state === 'live' ? 'warn' : '') + '">' + st + '</span>' : '') + '</div>' +
-    '<div class="m">' + esc(x.device || '') + '</div>' + (on && i.steps != null ? '<div class="m">' + fnum(i.steps, 0) + ' adım · ' + fnum(i.dist, 1) + ' m' + (i.sigma != null && i.steps ? ' · hata payı ±' + fnum(i.sigma, 0) + ' m' : '') + '</div>' : '') + loc + '</div>';
+    '<div class="m">' + esc(x.device || '') + '</div>' + (on && i.steps != null ? '<div class="m">' + fnum(i.steps, 0) + ' adım · ' + fnum(i.dist, 1) + ' m' + (i.sigma != null && i.steps ? ' · hata payı ±' + fnum(i.sigma, 0) + ' m' : '') + '</div>' : '') + loc + ((on && i.tr && i.tr.length > 1) ? '<canvas class="sk lv" data-k="' + esc(x.username + '|' + (x.device || '')) + '"></canvas><div class="m">' + (i.state === 'sim' ? 'SİMÜLASYON krokisi · ' : 'Canlı kroki (sensörden hesaplanan, yaklaşık) · ') + (i.tn ? i.tn.length + ' dönemeç · ' : '') + 'son ' + ago(x.at) + '</div>' : '') + '</div>';
+}
+var LIVEX = {};
+function drawLive(list) {
+  list.forEach(function (x) { var i = x.info || {}; if (x.age > ONL || !i.tr || i.tr.length < 2) return; LIVEX[x.username + '|' + (x.device || '')] = i; });
+  document.querySelectorAll('canvas.lv').forEach(function (cv) {
+    var i = LIVEX[cv.getAttribute('data-k')]; if (!i) return;
+    var o = i.org ? { lat: i.org[0], lng: i.org[1] } : { lat: 0, lng: 0 };
+    sketch(cv, { snap: { track: i.tr.map(function (p) { return { E: p[0], N: p[1] }; }), turns: (i.tn || []).map(function (t, k) { return { n: k + 1, E: t[0], N: t[1], angle: t[2] }; }) } });
+  });
 }
 function fail(el, r) { el.textContent = r.err === 'bad' ? 'Yönetici şifresi yanlış.' + (r.wait ? ' ' + r.wait + ' sn bekleyin.' : '') : r.err === 'locked' ? 'Çok deneme. ' + r.wait + ' sn bekleyin.' : (r.err || 'Hata'); }
 $('fl').addEventListener('submit', function (e) {
@@ -104,7 +113,7 @@ function load() {
     var on = r.live.filter(function (x) { return x.age <= ONL; }), names = {}; on.forEach(function (x) { names[x.username] = (names[x.username] || 0) + 1; });
     window.ONNAMES = names; markOnline();
     $('onlT').innerHTML = on.length ? on.map(function (x) { var i = x.info || {}; return '<b>' + esc(x.username) + '</b> · ' + (STATE[i.state] || 'AÇIK') + (i.state === 'live' && i.steps != null ? ' · ' + fnum(i.dist, 0) + ' m' : '') + ' · ' + esc(x.device || ''); }).join('<br>') : 'Şu an kimse açık değil. (Uygulama açıkken yaklaşık 30 sn\'de bir haber verir.)';
-    if (tab === 'l') $('tl').innerHTML = r.live.length ? r.live.map(liveRow).join('') : '<div class="m">Henüz kayıt yok. Güncellenmiş uygulamayı açan kişiler burada görünür.</div>';
+    if (tab === 'l') $('tl').innerHTML = r.live.length ? r.live.map(liveRow).join('') : '<div class="m">Henüz kayıt yok. Güncellenmiş uygulamayı açan kişiler burada görünür.</div>'; if (tab === 'l') drawLive(r.live);
   }, function (e) { $('onlT').textContent = e.message; if (tab === 'l') $('tl').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; });
   if (tab === 'a') archLoad();
   if (tab === 'u') call('users').then(function (r) { if (!r.ok) { fail($('me'), r); return; } if (document.activeElement !== $('od')) $('od').value = r.offline_days;
