@@ -85,13 +85,23 @@ function markOnline() {
 }
 function liveRow(x) {
   var i = x.info || {}, on = x.age <= ONL, st = STATE[i.state] || 'AÇIK';
-  var loc = (i.state === 'live' && i.lat != null && i.lng != null) ? '<a class="m" target="_blank" rel="noopener" href="https://www.google.com/maps?q=' + encodeURIComponent(i.lat + ',' + i.lng) + '">Son hesaplanan konum ↗</a>' : '';
+  var loc = (i.state === 'live' && (on || !(i.tr && i.tr.length > 1)) && i.lat != null && i.lng != null) ? '<a class="m" target="_blank" rel="noopener" href="https://www.google.com/maps?q=' + encodeURIComponent(i.lat + ',' + i.lng) + '">Son hesaplanan konum ↗</a>' : '';
   return '<div class="card u"><div class="n">' + esc(x.username) + (on ? '<span class="tag live">şu an açık</span>' : '<span class="tag">' + ago(x.at) + '</span>') + (on ? '<span class="tag ' + (i.state === 'live' ? 'warn' : '') + '">' + st + '</span>' : '') + '</div>' +
-    '<div class="m">' + esc(x.device || '') + '</div>' + (on && i.steps != null ? '<div class="m">' + fnum(i.steps, 0) + ' adım · ' + fnum(i.dist, 1) + ' m' + (i.sigma != null && i.steps ? ' · hata payı ±' + fnum(i.sigma, 0) + ' m' : '') + '</div>' : '') + loc + ((on && i.tr && i.tr.length > 1) ? '<canvas class="sk lv" data-k="' + esc(x.username + '|' + (x.device || '')) + '"></canvas><div class="m">' + (i.state === 'sim' ? 'SİMÜLASYON krokisi · ' : 'Canlı kroki (sensörden hesaplanan, yaklaşık) · ') + (i.tn ? i.tn.length + ' dönemeç · ' : '') + 'son ' + ago(x.at) + '</div>' : '') + '</div>';
+    '<div class="m">' + esc(x.device || '') + '</div>' + (on && i.steps != null ? '<div class="m">' + fnum(i.steps, 0) + ' adım · ' + fnum(i.dist, 1) + ' m' + (i.sigma != null && i.steps ? ' · hata payı ±' + fnum(i.sigma, 0) + ' m' : '') + '</div>' : '') + loc + lastBlock(x, i, on) + ((on && i.tr && i.tr.length > 1) ? '<canvas class="sk lv" data-k="' + esc(x.username + '|' + (x.device || '')) + '"></canvas><div class="m">' + (i.state === 'sim' ? 'SİMÜLASYON krokisi · ' : 'Canlı kroki (sensörden hesaplanan, yaklaşık) · ') + (i.tn ? i.tn.length + ' dönemeç · ' : '') + 'son ' + ago(x.at) + '</div>' : '') + '</div>';
+}
+function lastBlock(x, i, on) {
+  var L = i.last, cur = i.tr && i.tr.length > 1;
+  if (cur && on) return '';                       // şu an açık ve çiziyor: anlık kroki zaten aşağıda
+  var src = cur ? i : (L && L.tr && L.tr.length > 1 ? L : null); if (!src) return '';
+  var at = cur ? x.at : (L.at || x.at), lk = (src.lat != null && src.lng != null) ? '<a class="m" target="_blank" rel="noopener" href="https://www.google.com/maps?q=' + encodeURIComponent(src.lat + ',' + src.lng) + '">Son hesaplanan konum ↗</a>' : '';
+  return '<div class="m">Son ölçüm: ' + ago(at) + (src.steps != null ? ' · ' + fnum(src.steps, 0) + ' adım · ' + fnum(src.dist, 1) + ' m' : '') + (src.state === 'sim' ? ' · SİMÜLASYON' : '') + '</div>' + lk +
+    '<canvas class="sk lv" data-k="' + esc('L|' + x.username + '|' + (x.device || '')) + '"></canvas><div class="m">Son bilinen kroki (sensörden hesaplanan, yaklaşık)' + (src.tn ? ' · ' + src.tn.length + ' dönemeç' : '') + '</div>';
 }
 var LIVEX = {};
 function drawLive(list) {
-  list.forEach(function (x) { var i = x.info || {}; if (x.age > ONL || !i.tr || i.tr.length < 2) return; LIVEX[x.username + '|' + (x.device || '')] = i; });
+  list.forEach(function (x) { var i = x.info || {}, k = x.username + '|' + (x.device || '');
+    if (x.age <= ONL && i.tr && i.tr.length > 1) LIVEX[k] = i;
+    var src = (i.tr && i.tr.length > 1) ? i : (i.last && i.last.tr && i.last.tr.length > 1 ? i.last : null); if (src) LIVEX['L|' + k] = src; });
   document.querySelectorAll('canvas.lv').forEach(function (cv) {
     var i = LIVEX[cv.getAttribute('data-k')]; if (!i) return;
     var o = i.org ? { lat: i.org[0], lng: i.org[1] } : { lat: 0, lng: 0 };
