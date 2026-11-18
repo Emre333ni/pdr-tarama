@@ -30,7 +30,13 @@ canvas.sk{width:100%;height:340px;background:#080c14;border:1px solid var(--line
 table.t{width:100%;border-collapse:collapse;font:12px ui-monospace,monospace}table.t td,table.t th{border-bottom:1px solid var(--line);padding:4px 6px;text-align:left}
 .l b.fail,.l b.blocked{color:var(--bad)}.l b.login{color:var(--ok)}.l b.admin{color:var(--lamp)}
 [hidden]{display:none!important}
-</style></head><body><div class="w">
+div.lm{width:100%;height:340px;border:1px solid var(--line);border-radius:4px;background:#080c14;position:relative;z-index:0}
+.lmn{width:22px;height:22px;border-radius:50%;background:#0b111c;border:2px solid var(--lamp);color:#fff;font:700 11px/18px ui-monospace,monospace;text-align:center}
+.lmn.s{background:#fff;border-color:#fff}.lmn.e{background:#ff5a4a;border-color:#fff}
+.leaflet-container{font:12px system-ui,sans-serif}
+</style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script></head><body><div class="w">
 <div><h1>BOZKURT</h1><div class="sub">Yönetim paneli · yalnızca yönetici</div></div>
 
 <form id="fl" class="card" autocomplete="off">
@@ -106,7 +112,28 @@ function drawLive(list) {
     var i = LIVEX[cv.getAttribute('data-k')]; if (!i) return;
     var o = i.org ? { lat: i.org[0], lng: i.org[1] } : { lat: 0, lng: 0 };
     sketch(cv, { snap: { track: i.tr.map(function (p) { return { E: p[0], N: p[1] }; }), turns: (i.tn || []).map(function (t, k) { return { n: k + 1, E: t[0], N: t[1], angle: t[2] }; }) } });
+    try { mapLive(cv, i, o); } catch (e) { var b = cv.previousElementSibling; if (b && b.classList.contains('lm')) b.remove(); cv.style.display = ''; }   // harita yüklenemezse ızgara kroki kalır
   });
+}
+var LMAPS = [], LVIEW = {};
+function mapLive(cv, i, o) {   // kroki, uydu/sokak haritası üzerinde (başlangıç noktası gerçek GPS)
+  if (typeof L === 'undefined' || !i.org || !(Math.abs(o.lat) > 0 || Math.abs(o.lng) > 0)) return;
+  var kx = 111320 * Math.cos(o.lat * Math.PI / 180);
+  function ll(E, N) { return [o.lat + N / 111320, o.lng + E / kx]; }
+  var box = document.createElement('div'); box.className = 'sk lm'; cv.parentNode.insertBefore(box, cv); cv.style.display = 'none';
+  var map = L.map(box, { zoomControl: true, attributionControl: true }); LMAPS.push(map);
+  var sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, maxNativeZoom: 19, attribution: 'Esri' });
+  var osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20, maxNativeZoom: 19, attribution: '© OpenStreetMap' });
+  sat.addTo(map); if (L.control && L.control.layers) L.control.layers({ 'Uydu': sat, 'Sokak': osm }, null, { collapsed: true }).addTo(map);
+  var pts = i.tr.map(function (p) { return ll(p[0], p[1]); });
+  L.polyline(pts, { color: '#ffb81c', weight: 5, opacity: .95 }).addTo(map);
+  L.marker(pts[0], { icon: L.divIcon({ className: '', html: '<div class="lmn s"></div>', iconSize: [22, 22] }) }).addTo(map);
+  (i.tn || []).forEach(function (t, k) { L.marker(ll(t[0], t[1]), { icon: L.divIcon({ className: '', html: '<div class="lmn">' + (k + 1) + '</div>', iconSize: [22, 22] }) }).addTo(map); });
+  L.marker(pts[pts.length - 1], { icon: L.divIcon({ className: '', html: '<div class="lmn e"></div>', iconSize: [22, 22] }) }).addTo(map);
+  var key = cv.getAttribute('data-k'), v = LVIEW[key];
+  if (v) map.setView(v.c, v.z); else map.fitBounds(L.latLngBounds(pts), { padding: [30, 30], maxZoom: 19 });
+  var touched = !!v; ['mousedown', 'touchstart', 'wheel', 'dblclick'].forEach(function (ev) { box.addEventListener(ev, function () { touched = true; }, { passive: true }); });
+  map.on('moveend', function () { if (touched) LVIEW[key] = { c: map.getCenter(), z: map.getZoom() }; });   // elle kaydırdıysan 20 sn'de bir yenilenince görünüm sıfırlanmaz
 }
 function fail(el, r) { el.textContent = r.err === 'bad' ? 'Yönetici şifresi yanlış.' + (r.wait ? ' ' + r.wait + ' sn bekleyin.' : '') : r.err === 'locked' ? 'Çok deneme. ' + r.wait + ' sn bekleyin.' : (r.err || 'Hata'); }
 $('fl').addEventListener('submit', function (e) {
@@ -123,7 +150,7 @@ function load() {
     var on = r.live.filter(function (x) { return x.age <= ONL; }), names = {}; on.forEach(function (x) { names[x.username] = (names[x.username] || 0) + 1; });
     window.ONNAMES = names; markOnline();
     $('onlT').innerHTML = on.length ? on.map(function (x) { var i = x.info || {}; return '<b>' + esc(x.username) + '</b> · ' + (STATE[i.state] || 'AÇIK') + (i.state === 'live' && i.steps != null ? ' · ' + fnum(i.dist, 0) + ' m' : '') + ' · ' + esc(x.device || ''); }).join('<br>') : 'Şu an kimse açık değil. (Uygulama açıkken yaklaşık 30 sn\'de bir haber verir.)';
-    if (tab === 'l') $('tl').innerHTML = r.live.length ? r.live.map(liveRow).join('') : '<div class="m">Henüz kayıt yok. Güncellenmiş uygulamayı açan kişiler burada görünür.</div>'; if (tab === 'l') drawLive(r.live);
+    if (tab === 'l') { LMAPS.forEach(function (m) { try { m.remove(); } catch (e) { /* yok say */ } }); LMAPS = []; } if (tab === 'l') $('tl').innerHTML = r.live.length ? r.live.map(liveRow).join('') : '<div class="m">Henüz kayıt yok. Güncellenmiş uygulamayı açan kişiler burada görünür.</div>'; if (tab === 'l') drawLive(r.live);
   }, function (e) { $('onlT').textContent = e.message; if (tab === 'l') $('tl').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; });
   if (tab === 'a') archLoad();
   if (tab === 'u') call('users').then(function (r) { if (!r.ok) { fail($('me'), r); return; } if (document.activeElement !== $('od')) $('od').value = r.offline_days;
